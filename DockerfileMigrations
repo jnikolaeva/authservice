@@ -1,0 +1,6 @@
+FROM migrate/migrate:v4.11.0
+LABEL maintainer="Julia N."
+WORKDIR ./
+COPY ./data/migrations/* /migrations/
+
+CMD ["--help"]
