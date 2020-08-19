@@ -18,4 +18,5 @@ type Repository interface {
 	NextID() UserID
 	Add(user User) error
 	FindByCredentials(username string, password string) (*User, error)
+	Delete(userID UserID) error
 }

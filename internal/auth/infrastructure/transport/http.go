@@ -12,6 +12,8 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
 
+	"github.com/jnikolaeva/eshop-common/uuid"
+
 	"github.com/jnikolaeva/authservice/internal/auth/application"
 )
 
@@ -38,11 +40,13 @@ func NewHttpServer(errorLogger log.Logger, idService application.IdentityService
 	}
 }
 
-func (s *HttpServer) MakeHandler() http.Handler {
+func (s *HttpServer) MakeHandler(pathPrefix string) http.Handler {
 	r := mux.NewRouter()
-	sr := r.PathPrefix("/api/v1").Subrouter()
+	sr := r.PathPrefix(pathPrefix).Subrouter()
 	sr.Handle("/register", s.makeRegisterUserHandler()).Methods(http.MethodPost)
+	sr.Handle("/{userId}", s.makeDeleteUserHandler()).Methods(http.MethodDelete)
 	sr.Handle("/signin", s.makeSignInHandler()).Methods(http.MethodPost)
+	sr.Handle("/signin", s.makeSignInPageHandler()).Methods(http.MethodGet)
 	sr.Handle("/signout", s.makeSignOutHandler()).Methods(http.MethodPost)
 	sr.Handle("/auth", s.makeAuthHandler()).Methods(http.MethodGet)
 	return r
@@ -64,6 +68,25 @@ func (s *HttpServer) makeRegisterUserHandler() http.Handler {
 		if err := s.encodeResponse(ctx, w, &registerUserResponse{ID: userID.String()}); err != nil {
 			s.encodeErrorResponse(ctx, err, w)
 		}
+	})
+}
+
+func (s *HttpServer) makeDeleteUserHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		vars := mux.Vars(r)
+		sID, ok := vars["userId"]
+		if !ok {
+			s.encodeErrorResponse(ctx, ErrBadRequest, w)
+		}
+		id, err := uuid.FromString(sID)
+		if err != nil {
+			s.encodeErrorResponse(ctx, ErrBadRequest, w)
+		}
+		if err := s.idService.Delete(ctx, id); err != nil {
+			s.encodeErrorResponse(ctx, err, w)
+		}
+		_ = s.encodeResponse(ctx, w, nil)
 	})
 }
 
@@ -103,6 +126,13 @@ func (s *HttpServer) makeSignInHandler() http.Handler {
 	})
 }
 
+func (s *HttpServer) makeSignInPageHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte("Please use POST request to sign in"))
+	})
+}
+
 func (s *HttpServer) makeSignOutHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		session, err := s.sessionStore.Get(r, sessionCookieName)
@@ -128,7 +158,7 @@ func (s *HttpServer) makeAuthHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		session, err := s.sessionStore.Get(r, sessionCookieName)
 		if err != nil {
-			s.encodeErrorResponse(r.Context(), err, w)
+			s.encodeErrorResponse(r.Context(), errors.Wrap(ErrUnauthenticated, err.Error()), w)
 			return
 		}
 		userID, ok := session.Values["user_id"].(string)

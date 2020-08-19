@@ -56,6 +56,13 @@ func (r *repository) FindByCredentials(username string, password string) (*appli
 	return user, nil
 }
 
+func (r *repository) Delete(userID application.UserID) error {
+	_, err := r.connPool.Exec(
+		"DELETE FROM users WHERE id = $1",
+		userID.String())
+	return r.convertError(err)
+}
+
 func (r *repository) convertError(err error) error {
 	if err != nil {
 		pgErr, ok := err.(pgx.PgError)

@@ -3,6 +3,8 @@ package application
 import (
 	"context"
 	"errors"
+
+	"github.com/jnikolaeva/eshop-common/uuid"
 )
 
 var (
@@ -11,6 +13,7 @@ var (
 
 type IdentityService interface {
 	Register(ctx context.Context, username string, password string) (UserID, error)
+	Delete(ctx context.Context, userID uuid.UUID) error
 }
 
 func NewIdentityService(repo Repository) IdentityService {
@@ -35,4 +38,8 @@ func (s service) Register(ctx context.Context, username string, password string)
 	}
 
 	return user.ID, nil
+}
+
+func (s service) Delete(ctx context.Context, userID uuid.UUID) error {
+	return s.repo.Delete(UserID(userID))
 }
