@@ -17,26 +17,26 @@ import (
 	"github.com/jnikolaeva/authservice/internal/auth/application"
 )
 
-const sessionCookieName = "sid"
-
 var (
 	ErrUnauthenticated = errors.New("user is not authenticated")
 	ErrBadRequest      = errors.New("invalid request")
 )
 
 type HttpServer struct {
-	errorLogger  log.Logger
-	idService    application.IdentityService
-	authService  application.AuthService
-	sessionStore sessions.Store
+	errorLogger       log.Logger
+	idService         application.IdentityService
+	authService       application.AuthService
+	sessionStore      sessions.Store
+	sessionCookieName string
 }
 
-func NewHttpServer(errorLogger log.Logger, idService application.IdentityService, authService application.AuthService, sessionStore sessions.Store) *HttpServer {
+func NewHttpServer(errorLogger log.Logger, idService application.IdentityService, authService application.AuthService, sessionStore sessions.Store, sessionCookieName string) *HttpServer {
 	return &HttpServer{
-		errorLogger:  errorLogger,
-		idService:    idService,
-		authService:  authService,
-		sessionStore: sessionStore,
+		errorLogger:       errorLogger,
+		idService:         idService,
+		authService:       authService,
+		sessionStore:      sessionStore,
+		sessionCookieName: sessionCookieName,
 	}
 }
 
@@ -98,7 +98,7 @@ func (s *HttpServer) makeSignInHandler() http.Handler {
 			s.encodeErrorResponse(ctx, err, w)
 			return
 		}
-		session, err := s.sessionStore.Get(r, sessionCookieName)
+		session, err := s.sessionStore.Get(r, s.sessionCookieName)
 		if err != nil {
 			s.encodeErrorResponse(ctx, err, w)
 			return
@@ -135,7 +135,7 @@ func (s *HttpServer) makeSignInPageHandler() http.Handler {
 
 func (s *HttpServer) makeSignOutHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		session, err := s.sessionStore.Get(r, sessionCookieName)
+		session, err := s.sessionStore.Get(r, s.sessionCookieName)
 		if err != nil {
 			s.encodeErrorResponse(r.Context(), err, w)
 			return
@@ -156,7 +156,7 @@ func (s *HttpServer) makeSignOutHandler() http.Handler {
 
 func (s *HttpServer) makeAuthHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		session, err := s.sessionStore.Get(r, sessionCookieName)
+		session, err := s.sessionStore.Get(r, s.sessionCookieName)
 		if err != nil {
 			s.encodeErrorResponse(r.Context(), errors.Wrap(ErrUnauthenticated, err.Error()), w)
 			return
@@ -198,7 +198,7 @@ func decodeSignInRequest(_ context.Context, r *http.Request) (req signInRequest,
 	return req, nil
 }
 
-func (s *HttpServer) encodeResponse(ctx context.Context, w http.ResponseWriter, response interface{}) error {
+func (s *HttpServer) encodeResponse(_ context.Context, w http.ResponseWriter, response interface{}) error {
 	if response == nil {
 		w.WriteHeader(http.StatusNoContent)
 		return nil
