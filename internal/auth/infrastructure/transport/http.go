@@ -161,14 +161,14 @@ func (s *HttpServer) makeAuthHandler() http.Handler {
 			s.encodeErrorResponse(r.Context(), errors.Wrap(ErrUnauthenticated, err.Error()), w)
 			return
 		}
-		userID, ok := session.Values["user_id"].(string)
-		if !ok || userID == "" {
+		userID, found := session.Values["user_id"]
+		if !found || userID == "" {
 			s.encodeErrorResponse(r.Context(), ErrUnauthenticated, w)
 			return
 		}
 
-		w.Header().Set("X-Auth-User-Id", userID)
-		w.WriteHeader(http.StatusNoContent)
+		w.Header().Set("X-Auth-User-Id", userID.(string))
+		w.WriteHeader(http.StatusOK)
 	})
 }
 

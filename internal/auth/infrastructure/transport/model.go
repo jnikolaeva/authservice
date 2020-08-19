@@ -13,8 +13,8 @@ type signInRequest struct {
 }
 
 type signInResponse struct {
-	ID       string
-	Username string
+	ID       string `json:"id"`
+	Username string `json:"username"`
 }
 
 type errorResponse struct {
