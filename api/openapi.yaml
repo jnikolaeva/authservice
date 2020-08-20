@@ -1,0 +1,179 @@
+openapi: 3.0.0
+info:
+  title: Demo identity provider and authentication API
+  description: |
+    This is simple client API
+  contact:
+    email: julia.matveeva@gmail.com
+  version: 1.0.0
+servers:
+  - url: http://hostname/api/v1/auth
+tags:
+  - name: authentication
+    description: Authentication operations
+  - name: users
+    description: User management operations
+paths:
+  /signin:
+    post:
+      tags:
+        - authentication
+      description: Sign in customer
+      operationId: signin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - id
+                  - username
+                properties:
+                  id:
+                    type: string
+                  username:
+                    type: string
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /signout:
+    post:
+      tags:
+        - authentication
+      description: Sign out customer
+      operationId: signout
+      responses:
+        "204":
+          description: OK
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth:
+    get:
+      tags:
+        - authentication
+      description: Check if user is authenticated
+      operationId: auth
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-Auth-User-Id:
+              schema:
+                type: string
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+
+  /auth/users:
+    post:
+      tags:
+        - users
+      description: Register new user
+      operationId: registerUser
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - id
+                properties:
+                  id:
+                    type: string
+        "409":
+          description: duplicate username
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+
+  /auth/users/{id}:
+    delete:
+      tags:
+        - users
+      description: Delete a user
+      operationId: deleteUser
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: OK
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      required:
+        - code
+        - message
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+        message:
+          type: string

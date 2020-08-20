@@ -43,8 +43,8 @@ func NewHttpServer(errorLogger log.Logger, idService application.IdentityService
 func (s *HttpServer) MakeHandler(pathPrefix string) http.Handler {
 	r := mux.NewRouter()
 	sr := r.PathPrefix(pathPrefix).Subrouter()
-	sr.Handle("/register", s.makeRegisterUserHandler()).Methods(http.MethodPost)
-	sr.Handle("/{userId}", s.makeDeleteUserHandler()).Methods(http.MethodDelete)
+	sr.Handle("/users", s.makeRegisterUserHandler()).Methods(http.MethodPost)
+	sr.Handle("/users/{userId}", s.makeDeleteUserHandler()).Methods(http.MethodDelete)
 	sr.Handle("/signin", s.makeSignInHandler()).Methods(http.MethodPost)
 	sr.Handle("/signin", s.makeSignInPageHandler()).Methods(http.MethodGet)
 	sr.Handle("/signout", s.makeSignOutHandler()).Methods(http.MethodPost)
@@ -109,7 +109,7 @@ func (s *HttpServer) makeSignInHandler() http.Handler {
 			session.Values["user_id"] = ""
 			_ = session.Save(r, w)
 
-			s.encodeErrorResponse(ctx, err, w)
+			s.encodeErrorResponse(ctx, errors.Wrap(ErrUnauthenticated, err.Error()), w)
 			return
 		}
 
