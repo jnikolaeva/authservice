@@ -12,7 +12,6 @@ import (
 	gokitlog "github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	gokitprometheus "github.com/go-kit/kit/metrics/prometheus"
-	"github.com/gorilla/sessions"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
@@ -24,6 +23,8 @@ import (
 	"github.com/jnikolaeva/authservice/internal/auth/infrastructure/postgres"
 	usertransport "github.com/jnikolaeva/authservice/internal/auth/infrastructure/transport"
 	"github.com/jnikolaeva/authservice/internal/probes"
+
+	redisStore "gopkg.in/boj/redistore.v1"
 )
 
 const (
@@ -61,16 +62,29 @@ func main() {
 	}
 	defer connectionPool.Close()
 
-	sessionLifetime := envAsInt("SESSION_LIFETIME", 30)
-	sessionCookieName := envString("SESSION_COOKIE", "sid")
-
 	repository := postgres.New(connectionPool)
 	identityService := application.NewIdentityService(repository)
 	authService := application.NewAuthService(repository)
 
-	sessionStorage := sessions.NewFilesystemStore("", []byte("something-very-secret"))
-	sessionStorage.MaxAge(sessionLifetime)
-	sessionStorage.Options.HttpOnly = true
+	sessionLifetime := envAsInt("SESSION_LIFETIME", 30)
+	sessionCookieName := envString("SESSION_COOKIE", "sid")
+
+	redisPassword := envString("REDIS_PASSWORD", "")
+	if redisPassword == "" {
+		logger.Fatal("environment variable REDIS_PASSWORD must be set")
+	}
+	redisAddr := envString("REDIS_ADDR", "")
+	if redisAddr == "" {
+		logger.Fatal("environment variable REDIS_ADDR must be set")
+	}
+	sessionStore, err := redisStore.NewRediStore(5, "tcp", redisAddr, redisPassword, []byte("secret-key"))
+	if err != nil {
+		logger.Fatal(err.Error())
+	}
+	defer sessionStore.Close()
+
+	sessionStore.Options.MaxAge = sessionLifetime * 86400
+	sessionStore.Options.HttpOnly = true
 
 	metrics := httpkit.NewMetricsHolder(gokitprometheus.NewCounterFrom(prometheus.CounterOpts{
 		Namespace: "auth",
@@ -84,7 +98,7 @@ func main() {
 			Buckets:   prometheus.DefBuckets,
 		}, []string{"method", "endpoint"}))
 
-	apiServer := usertransport.NewHttpServer(errorLogger, identityService, authService, sessionStorage, sessionCookieName, metrics)
+	apiServer := usertransport.NewHttpServer(errorLogger, identityService, authService, sessionStore, sessionCookieName, metrics)
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/v1/", apiServer.MakeHandler("/api/v1/auth"))
