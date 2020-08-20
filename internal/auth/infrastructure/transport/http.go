@@ -10,6 +10,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
+	"github.com/jnikolaeva/eshop-common/httpkit"
 	"github.com/pkg/errors"
 
 	"github.com/jnikolaeva/eshop-common/uuid"
@@ -28,27 +29,30 @@ type HttpServer struct {
 	authService       application.AuthService
 	sessionStore      sessions.Store
 	sessionCookieName string
+	metrics           *httpkit.MetricsHolder
 }
 
-func NewHttpServer(errorLogger log.Logger, idService application.IdentityService, authService application.AuthService, sessionStore sessions.Store, sessionCookieName string) *HttpServer {
+func NewHttpServer(errorLogger log.Logger, idService application.IdentityService, authService application.AuthService,
+	sessionStore sessions.Store, sessionCookieName string, metrics *httpkit.MetricsHolder) *HttpServer {
 	return &HttpServer{
 		errorLogger:       errorLogger,
 		idService:         idService,
 		authService:       authService,
 		sessionStore:      sessionStore,
 		sessionCookieName: sessionCookieName,
+		metrics:           metrics,
 	}
 }
 
 func (s *HttpServer) MakeHandler(pathPrefix string) http.Handler {
 	r := mux.NewRouter()
 	sr := r.PathPrefix(pathPrefix).Subrouter()
-	sr.Handle("/users", s.makeRegisterUserHandler()).Methods(http.MethodPost)
-	sr.Handle("/users/{userId}", s.makeDeleteUserHandler()).Methods(http.MethodDelete)
-	sr.Handle("/signin", s.makeSignInHandler()).Methods(http.MethodPost)
+	sr.Handle("/users", httpkit.InstrumentingMiddleware(s.makeRegisterUserHandler(), s.metrics, "RegisterCustomer")).Methods(http.MethodPost)
+	sr.Handle("/users/{userId}", httpkit.InstrumentingMiddleware(s.makeDeleteUserHandler(), s.metrics, "DeleteCustomer")).Methods(http.MethodDelete)
+	sr.Handle("/signin", httpkit.InstrumentingMiddleware(s.makeSignInHandler(), s.metrics, "SignIn")).Methods(http.MethodPost)
 	sr.Handle("/signin", s.makeSignInPageHandler()).Methods(http.MethodGet)
-	sr.Handle("/signout", s.makeSignOutHandler()).Methods(http.MethodPost)
-	sr.Handle("/auth", s.makeAuthHandler()).Methods(http.MethodGet)
+	sr.Handle("/signout", httpkit.InstrumentingMiddleware(s.makeSignOutHandler(), s.metrics, "SignOut")).Methods(http.MethodPost)
+	sr.Handle("/auth", httpkit.InstrumentingMiddleware(s.makeAuthHandler(), s.metrics, "Auth")).Methods(http.MethodGet)
 	return r
 }
 

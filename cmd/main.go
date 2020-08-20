@@ -11,9 +11,13 @@ import (
 
 	gokitlog "github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	gokitprometheus "github.com/go-kit/kit/metrics/prometheus"
 	"github.com/gorilla/sessions"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 
+	"github.com/jnikolaeva/eshop-common/httpkit"
 	postgresadapter "github.com/jnikolaeva/eshop-common/postgres"
 
 	"github.com/jnikolaeva/authservice/internal/auth/application"
@@ -67,14 +71,26 @@ func main() {
 	sessionStorage := sessions.NewFilesystemStore("", []byte("something-very-secret"))
 	sessionStorage.MaxAge(sessionLifetime)
 	sessionStorage.Options.HttpOnly = true
-	//sessionStorage.Options.Secure = true
 
-	apiServer := usertransport.NewHttpServer(errorLogger, identityService, authService, sessionStorage, sessionCookieName)
+	metrics := httpkit.NewMetricsHolder(gokitprometheus.NewCounterFrom(prometheus.CounterOpts{
+		Namespace: "auth",
+		Name:      "request_count",
+		Help:      "Number of requests received.",
+	}, []string{"method", "endpoint", "status_code"}),
+		gokitprometheus.NewHistogramFrom(prometheus.HistogramOpts{
+			Namespace: "auth",
+			Name:      "request_latency_seconds",
+			Help:      "Total duration of request in seconds.",
+			Buckets:   prometheus.DefBuckets,
+		}, []string{"method", "endpoint"}))
+
+	apiServer := usertransport.NewHttpServer(errorLogger, identityService, authService, sessionStorage, sessionCookieName, metrics)
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/v1/", apiServer.MakeHandler("/api/v1/auth"))
 	mux.Handle("/ready", probes.MakeReadyHandler())
 	mux.Handle("/live", probes.MakeLiveHandler())
+	mux.Handle("/metrics", promhttp.Handler())
 
 	srv := startServer(serverAddr, mux, logger)
 
