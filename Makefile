@@ -1,6 +1,7 @@
 APP_EXECUTABLE?=./bin/auth
-RELEASE?=0.1
-MIGRATIONS_IMAGENAME?=arahna/auth-service-migrations:v$(RELEASE)
+RELEASE?=1.0
+MIGRATIONS_RELEASE?=0.1
+MIGRATIONS_IMAGENAME?=arahna/auth-service-migrations:v$(MIGRATIONS_RELEASE)
 IMAGENAME?=arahna/auth-service:v$(RELEASE)
 
 .PHONY: clean
